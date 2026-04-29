@@ -1,0 +1,13 @@
+[project]
+name = "company-reasearch-tool"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.136.1",
+    "logger>=1.4",
+    "pydantic-settings>=2.14.0",
+    "qdrant-client>=1.17.1",
+    "uvicorn>=0.46.0",
+]
