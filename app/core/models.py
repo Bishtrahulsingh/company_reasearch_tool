@@ -1,10 +1,12 @@
 import uuid
 import datetime
+from typing import Union
+
 from pydantic import BaseModel, ConfigDict
 
 
 class Chunk(BaseModel):
-    id:uuid.UUID
+    id:Union[uuid.UUID,str]
     text:str
     embedding:list[float]
     company:str
