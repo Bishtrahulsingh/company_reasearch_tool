@@ -8,3 +8,6 @@ wheels/
 
 # Virtual environments
 .venv
+
+#hide env file
+.env
