@@ -5,7 +5,7 @@ from typing import Dict,List,Any
 from app.core.models import Chunk
 
 
-def chunk_text(text, size, overlap)->List[Chunk]:
+def chunk_text(text:str,published_date:datetime.datetime,company:str,source_url:str, size:int=500, overlap:int=50)->List[Chunk]:
     chunks = []
 
     step = size-overlap
@@ -21,8 +21,8 @@ def chunk_text(text, size, overlap)->List[Chunk]:
              id = str(uuid.uuid4()),
              text= text[start:end],
              embedding=[],
-             company='',
-             source_url='',
+             company=company,
+             source_url=source_url,
              published_date= datetime.datetime.now(datetime.timezone.utc),
              score=0.0
          )

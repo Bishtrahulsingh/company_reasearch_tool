@@ -1,9 +1,11 @@
 import asyncio
+from typing import Dict
 
 import httpx
 import trafilatura
 
 from app.config.settings import settings
+from app.core.models import WebSearchResult
 
 url = "https://google.serper.dev/search"
 
@@ -15,7 +17,7 @@ async def extract_from_url(client, site_url:str):
     except Exception:
         return None
 
-async def search_web(query, company):
+async def search_web(query, company)->Dict[WebSearchResult]:
     payload = {
         "q": f"{query} for {company}"
     }
@@ -45,7 +47,6 @@ async def search_web(query, company):
 
         for item,content in zip(items,contents):
             item['text'] = content
-            print(item,end="\n-------------------\n")
 
         return {
             'summary': summary,

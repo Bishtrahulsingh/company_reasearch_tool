@@ -10,10 +10,6 @@ app = FastAPI()
 
 @app.get('/')
 async def index():
-    print('hello')
-    github_data = await get_github_activity('makenotion/notion-sdk-js',27)
-    print(github_data)
-
     return {'hello': 'world'}
 
 

@@ -4,7 +4,7 @@ from fastembed import TextEmbedding
 
 embedding_model = TextEmbedding()
 
-def embed_chunks(chunks,batch_size:int=18)->List[Chunk]:
+def embed_chunks(chunks:List[Chunk],batch_size:int=18)->List[Chunk]:
     if not chunks:
         return []
 

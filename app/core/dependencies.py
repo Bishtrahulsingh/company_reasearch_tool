@@ -1,6 +1,7 @@
-from qdrant_client import QdrantClient
+from qdrant_client import AsyncQdrantClient
+
 
 def get_qdrant_client():
-    client = QdrantClient(":memory:")
+    client = AsyncQdrantClient(":memory:")
     return client
 
