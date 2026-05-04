@@ -1,4 +1,5 @@
 import asyncio
+import datetime
 from typing import Dict
 
 import httpx
@@ -9,6 +10,16 @@ from app.core.models import WebSearchResult
 
 url = "https://google.serper.dev/search"
 
+def parse_date(date_str):
+    if not date_str:
+        return None
+    for fmt in ("%b %d, %Y", "%Y-%m-%d", "%B %d, %Y"):
+        try:
+            return datetime.datetime.strptime(date_str, fmt).date()
+        except ValueError:
+            continue
+    return None
+
 async def extract_from_url(client, site_url:str):
     try:
         response = await client.get(site_url, timeout=10)
@@ -17,10 +28,11 @@ async def extract_from_url(client, site_url:str):
     except Exception:
         return None
 
-async def search_web(query, company)->Dict[WebSearchResult]:
+async def search_web(query, company)->WebSearchResult:
     payload = {
         "q": f"{query} for {company}"
     }
+
     headers = {
         'X-API-KEY': settings.X_API_KEY,
         'Content-Type': 'application/json'
@@ -29,7 +41,7 @@ async def search_web(query, company)->Dict[WebSearchResult]:
     async with httpx.AsyncClient() as client:
         response = await client.post(url, json=payload, headers=headers)
         data = response.json()
-        summary = data.get('answerBox',{}).get('snippet')
+        summary = data.get('answerBox',{}).get('snippet','')
         organic = data.get('organic',[])
 
         items = []
@@ -38,7 +50,7 @@ async def search_web(query, company)->Dict[WebSearchResult]:
                 'title': item.get('title'),
                 'text': None,
                 'url' : item.get('link'),
-                'published_at': item.get('date'),
+                'published_at': parse_date(item.get('date')),
                 'company' : company,
             })
 
@@ -48,7 +60,4 @@ async def search_web(query, company)->Dict[WebSearchResult]:
         for item,content in zip(items,contents):
             item['text'] = content
 
-        return {
-            'summary': summary,
-            'items':items
-        }
+        return WebSearchResult(summary= summary,items= items)

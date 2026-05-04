@@ -14,7 +14,9 @@ router = APIRouter(prefix='/api',tags=['query'])
 @router.post('/query')
 async def make_query(collection_name:str,company:str, query:str)->List[Chunk]:
     chunks = await retrieve(collection_name=collection_name,query=query,company=company)
-    return chunks
+    for chunk in chunks:
+        print(chunk,end='\n---------------------\n')
+    return []
 
 
 COMPANY_QUERY_TEMPLATES = [
@@ -36,7 +38,9 @@ async def search_company(collection_name: str,company: str):
         query = template.format(company=company)
         result = await search_web(query=query, company=company)
 
-        for item in result.get('items', []):
+        print(result,end='\n---------------------\n')
+
+        for item in result.items:
             text = item.get('text') or ''
             if not text or is_duplicate(text, seen_hashes):
                 continue

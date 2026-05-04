@@ -1,18 +1,17 @@
 from typing import List, Dict, Any
-
 from logger import logger
-from qdrant_client.conversions.common_types import HnswConfigDiff, SearchParams, PointStruct, Filter
-from qdrant_client.grpc import FieldCondition
-from qdrant_client.http.models import VectorParams, Distance, models, MatchValue, Match
-
+from qdrant_client.models import HnswConfigDiff, PointStruct,Filter, FieldCondition, MatchValue,VectorParams,Distance,Match
+from qdrant_client.models import SearchParams
+from app.core.dependencies import get_qdrant_client
 from app.core.models import Chunk
-from main import client
 
+client = get_qdrant_client()
 
 
 async def create_collection(name)->None:
     if await client.collection_exists(name):
         logger.info(f"Collection {name} already exists")
+        return
     else:
         await client.create_collection(
             collection_name=name,
@@ -20,7 +19,6 @@ async def create_collection(name)->None:
                 size=384,
                 distance=Distance.COSINE
             ),
-            search_params=SearchParams(hnsw_ef = 128),
             hnsw_config=HnswConfigDiff(
                 m = 16,
                 ef_construct=100,
@@ -54,29 +52,31 @@ async def upsert_chunks(collection_name, chunks,batch:int=32):
             )
         logger.info(f"upserted {total_size} chunks into {collection_name}")
 
-async def filter_chunks_by_company_name(collection_name:str,company:str,query_vector:List[float],score_threshold:float=0.7,top_k:int=20)->List[Dict[str,Any]]:
+async def filter_chunks_by_company_name(collection_name:str,company:str,query_vector:List[float],score_threshold:float=0.7,top_k:int=20):
     chunks = await client.query_points(
         collection_name=collection_name,
-        query_vector=query_vector,
-        query_filter=models.Filter(
+        query=query_vector,
+        query_filter=Filter(
             must=[
-                models.FieldCondition(
+                FieldCondition(
                     key='company',
-                    match=models.MatchValue(value=company.lower().strip())
+                    match=MatchValue(value=company.lower().strip())
                 )
             ]
         ),
         limit=top_k,
         score_threshold=score_threshold,
+        with_payload=True
     )
 
-    #store score of each chunk watch Chunk schema for more detail
-    return chunks
+    for point in chunks.points:
+        point.payload['score'] = point.score
+    return chunks.points
 
 
 async def retrieve_all_chunks(collection_name:str, company:str)->List[Chunk]:
     company = company.lower().strip()
-    results, _ = client.scroll(
+    results, _ = await client.scroll(
         collection_name=collection_name,
         scroll_filter=Filter(
             must=[

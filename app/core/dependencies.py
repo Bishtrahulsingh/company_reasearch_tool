@@ -1,7 +1,16 @@
 from qdrant_client import AsyncQdrantClient
 
+from app.config.settings import settings
+
 
 def get_qdrant_client():
-    client = AsyncQdrantClient(":memory:")
+
+    client = AsyncQdrantClient(
+        url=settings.QDRANT_BASE_URL,
+        api_key=settings.QDRANT_API_KEY,
+    )
+
+
     return client
+
 
