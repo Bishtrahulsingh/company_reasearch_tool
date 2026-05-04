@@ -9,6 +9,7 @@ from app.core.models import Chunk
 from main import client
 
 
+
 async def create_collection(name)->None:
     if await client.collection_exists(name):
         logger.info(f"Collection {name} already exists")
