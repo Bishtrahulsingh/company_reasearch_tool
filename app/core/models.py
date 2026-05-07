@@ -18,11 +18,10 @@ class Chunk(BaseModel):
 
 
 class JobStatus(BaseModel):
-    job_id:uuid.UUID
+    job_id:str
     status:str
     message:str
     model_config = ConfigDict(str_strip_whitespace=True,extra='forbid',from_attributes=True)
-
 
 class WebSearchResult(BaseModel):
     summary:str
