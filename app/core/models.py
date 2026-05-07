@@ -1,6 +1,6 @@
 import uuid
 import datetime
-from typing import Union
+from typing import Union, Dict, List
 
 from pydantic import BaseModel, ConfigDict
 
@@ -9,6 +9,7 @@ class Chunk(BaseModel):
     id:Union[uuid.UUID,str]
     text:str
     embedding:list[float]=[]
+    sparse_embedding: Dict[str, List] = {}
     company:str
     source_url:str=''
     published_date:datetime.datetime=datetime.datetime.now()
