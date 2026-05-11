@@ -13,14 +13,14 @@ from app.ingestion.scraper import search_web
 from app.rag.retriever import retrieve
 
 
-router = APIRouter(prefix='/api',tags=['query'])
+router = APIRouter(prefix='/api', tags=['query'])
 
 @router.post('/query')
-async def make_query(collection_name:str,company:str, query:str)->List[Chunk]:
+async def make_query(collection_name: str, company: str, query: str) -> List[Chunk]:
     client = get_qdrant_client()
-    chunks = await retrieve(client=client,collection_name=collection_name,query=query,company=company)
+    chunks = await retrieve(client=client, collection_name=collection_name, query=query, company=company)
     for chunk in chunks:
-        print(chunk,end='\n---------------------\n')
+        print(chunk, end='\n---------------------\n')
     return []
 
 
@@ -36,6 +36,8 @@ _jobs: dict[str, JobStatus] = {}
 
 async def _run(job_id: str, collection_name: str, company: str):
     try:
+        client = get_qdrant_client()
+
         search_coroutines = [
             search_web(query=t.format(company=company), company=company)
             for t in COMPANY_QUERY_TEMPLATES
@@ -69,8 +71,9 @@ async def _run(job_id: str, collection_name: str, company: str):
 
         _jobs[job_id] = JobStatus(job_id=job_id, status="running", message="Embedding chunks...")
         embedded_chunks = embed_chunks(all_chunks)
-        _jobs[job_id] = JobStatus(job_id=job_id, status="running", message="Storing in Qdrant...")
-        await upsert_chunks(collection_name=collection_name, chunks=[c.model_dump() for c in embedded_chunks])
+
+        _jobs[job_id] = JobStatus(job_id=job_id, status="running", message="Storing in Qdrant..")
+        await upsert_chunks(client=client, collection_name=collection_name, chunks=[c.model_dump() for c in embedded_chunks])
 
         _jobs[job_id] = JobStatus(job_id=job_id, status="done", message=f"Ingested {len(embedded_chunks)} chunks")
 
@@ -85,11 +88,8 @@ async def search_company(
     background_tasks: BackgroundTasks,
 ):
     job_id = str(uuid.uuid4())
-
     _jobs[job_id] = JobStatus(job_id=job_id, status="queued", message="Waiting to start")
-
     background_tasks.add_task(_run, job_id, collection_name, company)
-
     return {"job_id": job_id}
 
 
@@ -100,6 +100,7 @@ async def get_job(job_id: str) -> JobStatus:
     return _jobs[job_id]
 
 @router.get('/companies/{company}/chunks')
-async def get_company_chunks(collection_name:str,company:str)->List[Chunk]:
-    chunks = await retrieve_all_chunks(collection_name=collection_name,company=company)
+async def get_company_chunks(collection_name: str, company: str) -> List[Chunk]:
+    client = get_qdrant_client()
+    chunks = await retrieve_all_chunks(client=client, collection_name=collection_name, company=company)
     return chunks
