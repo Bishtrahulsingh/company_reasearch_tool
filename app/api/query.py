@@ -2,6 +2,7 @@ import asyncio
 import uuid
 from typing import List, Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from app.core.dependencies import get_qdrant_client
 from app.core.models import Chunk, JobStatus
 from app.ingestion.chunking import chunk_text
 from app.ingestion.deduplicator import is_duplicate
@@ -16,7 +17,8 @@ router = APIRouter(prefix='/api',tags=['query'])
 
 @router.post('/query')
 async def make_query(collection_name:str,company:str, query:str)->List[Chunk]:
-    chunks = await retrieve(collection_name=collection_name,query=query,company=company)
+    client = get_qdrant_client()
+    chunks = await retrieve(client=client,collection_name=collection_name,query=query,company=company)
     for chunk in chunks:
         print(chunk,end='\n---------------------\n')
     return []

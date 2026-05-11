@@ -6,15 +6,7 @@ from app.core.dependencies import get_qdrant_client
 from app.api.query import router as query_router
 from app.ingestion.qdrant_client import create_collection
 
-
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await create_collection('company_details')
-    yield
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.include_router(query_router)
 @app.get('/')
