@@ -1,3 +1,4 @@
+import uuid
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -22,5 +23,7 @@ app.include_router(query_router)
 async def index():
     return {'hello': 'world'}
 
-
+@app.get('/session/new')
+async def new_session():
+    return {"session_id": str(uuid.uuid4())}
 
