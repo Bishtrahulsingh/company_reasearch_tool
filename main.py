@@ -1,6 +1,8 @@
+from dotenv import load_dotenv
+load_dotenv(override=False)
+
 import uuid
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.dependencies import get_qdrant_client

@@ -1,20 +1,24 @@
 import json
 import re
-from langgraph.graph import StateGraph, END
+from langfuse import get_client, observe, propagate_attributes
+from langgraph.graph import END, START, StateGraph
 from langchain_groq import ChatGroq
 from app.agent.state import AgentState
-from app.agent.tools import query_rag_tool, search_web_tool, get_github_tool
+from app.agent.tools import get_github_tool, query_rag_tool, search_web_tool
 from app.config.settings import settings
-from langgraph.graph import START
+from app.observability.costlogger import log_generation
+
+langfuse = get_client()
+
+_MODEL_NAME = "llama-3.3-70b-versatile"
 
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model=_MODEL_NAME,
     api_key=settings.GROQ_API_KEY,
     temperature=0,
 )
 
 SYSTEM_PROMPT = """You are a company research assistant. Your job is to research companies and answer questions about them.
-
 You have access to these tools:
 - search_web: Search the web for company info and store in RAG
 - get_github: Fetch GitHub activity for a company's repo
@@ -34,7 +38,6 @@ To give the final answer:
 {"answer": "<your final answer here>"}
 """
 
-
 def _parse_json(data: str):
     try:
         return json.loads(data)
@@ -51,44 +54,76 @@ def _parse_json(data: str):
     raise Exception("invalid json data provided")
 
 
+@observe(name="reason", as_type="generation")
 async def reason(state: AgentState):
-    print("hello from reason\n")
-    messages = [{'role': 'system', "content": SYSTEM_PROMPT}]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    history_messages = state.get('messages', [])
-
+    history_messages = state.get("messages", [])
     if history_messages:
         messages.extend(history_messages)
     else:
-        session_id, company = state.get('company', "::").split("::")
-        user_message = (f"Research this company: {company}\n\n"
-                        f"Question: {state.get('question')}\n\n"
-                        f"Session ID: {session_id}")
+        session_id, company = state.get("company", "::").split("::")
+        user_message = (
+            f"Research this company: {company}\n\n"
+            f"Question: {state.get('question')}\n\n"
+            f"Session ID: {session_id}"
+        )
         messages.append({"role": "user", "content": user_message})
 
-    for obs in state.get('observations', []):
-        messages.append({'role': "user", "content": f'Tool result:{obs}'})
+    for obs in state.get("observations", []):
+        messages.append({"role": "user", "content": f"Tool result:{obs}"})
 
     response = await llm.ainvoke(messages)
-
-    print(response,end="\n__________\n")
     raw = response.content.strip()
 
-    state['messages'].append({"role": "assistant", "content": raw})
+    usage = getattr(response, "usage_metadata", None) or getattr(response, "response_metadata", {}).get("token_usage", {})
 
+    input_tokens: int = (
+        getattr(usage, "input_tokens", None)
+        or getattr(usage, "prompt_tokens", None)
+        or (usage.get("input_tokens") if isinstance(usage, dict) else None)
+        or (usage.get("prompt_tokens") if isinstance(usage, dict) else None)
+        or 0
+    )
+    output_tokens: int = (
+        getattr(usage, "output_tokens", None)
+        or getattr(usage, "completion_tokens", None)
+        or (usage.get("output_tokens") if isinstance(usage, dict) else None)
+        or (usage.get("completion_tokens") if isinstance(usage, dict) else None)
+        or 0
+    )
+
+    step_cost = log_generation(
+        model=_MODEL_NAME,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
+
+    langfuse.update_current_generation(
+        model=_MODEL_NAME,
+        usage_details={
+            "input_tokens": input_tokens,
+            "output_tokens": output_tokens,
+        },
+        metadata={"step_cost_usd": step_cost},
+    )
+
+    state["messages"].append({"role": "assistant", "content": raw})
     parsed_res = _parse_json(raw)
 
-    if 'answer' in parsed_res:
-        state['answer'] = parsed_res['answer']
+    if "answer" in parsed_res:
+        state["answer"] = parsed_res["answer"]
     elif "tool" in parsed_res:
-        state['tool_calls'] = [parsed_res]
+        state["tool_calls"] = [parsed_res]
 
     return {
         **state,
         "steps": state.get("steps", 0) + 1,
+        "cost_usd": state.get("cost_usd", 0.0) + step_cost,
     }
 
 
+@observe(name="act")
 async def act(state: AgentState) -> AgentState:
     tool_calls = list(state.get("tool_calls", []))
     if not tool_calls:
@@ -97,12 +132,9 @@ async def act(state: AgentState) -> AgentState:
     call = tool_calls.pop(0)
     tool_name = call["tool"]
     tool_input = call.get("tool_input", {})
-
     parts = state["company"].split("::", 1)
     session_id = parts[0]
     company = parts[1] if len(parts) > 1 else parts[0]
-
-    print(f"act: calling tool '{tool_name}' with input {tool_input}\n")
 
     if tool_name == "query_rag":
         result = await query_rag_tool(
@@ -110,14 +142,12 @@ async def act(state: AgentState) -> AgentState:
             company=company,
             session_id=session_id,
         )
-
     elif tool_name == "search_web":
         result = await search_web_tool(
             query=tool_input.get("query", state["question"]),
             company=company,
             session_id=session_id,
         )
-
     elif tool_name == "get_github":
         result = await get_github_tool(
             repo=tool_input["repo"],
@@ -125,7 +155,6 @@ async def act(state: AgentState) -> AgentState:
             company=company,
             session_id=session_id,
         )
-
     else:
         result = f"Unknown tool requested: {tool_name}"
 
@@ -135,7 +164,9 @@ async def act(state: AgentState) -> AgentState:
         "_pending_observation": result,
     }
 
-def observe(state: AgentState) -> AgentState:
+
+@observe(name="observe")
+def observe_node(state: AgentState) -> AgentState:
     observations = list(state.get("observations", []))
     pending = state.get("_pending_observation")
 
@@ -158,45 +189,44 @@ def decide(state: AgentState) -> str:
         return "end"
     return "act"
 
-
 graph = StateGraph(AgentState)
 graph.add_node("reason", reason)
 graph.add_node("act", act)
-graph.add_node("observe", observe)
-
+graph.add_node("observe", observe_node)
 graph.add_edge(START, "reason")
-
 graph.add_conditional_edges("reason", decide, {"act": "act", "end": END})
 graph.add_edge("act", "observe")
 graph.add_edge("observe", "reason")
 
 agent = graph.compile()
 
-
 def _company_key(session_id: str, company: str) -> str:
     return f"{session_id}::{company.lower().strip()}"
 
 
-
+@observe(name="run_agent")
 async def run_agent(question: str, company: str, session_id: str) -> dict:
-    company_key = _company_key(session_id, company)
-    initial_state: AgentState = {
-        "question": question,
-        "company": company_key,
-        "messages": [],
-        "tool_calls": [],
-        "observations": [],
-        "answer": '',
-        "steps": 0,
-        "cost_usd":0.0
-    }
+    with propagate_attributes(
+        session_id=session_id,
+        metadata={"company": company},
+    ):
+        company_key = _company_key(session_id, company)
+        initial_state: AgentState = {
+            "question": question,
+            "company": company_key,
+            "messages": [],
+            "tool_calls": [],
+            "observations": [],
+            "answer": "",
+            "steps": 0,
+            "cost_usd": 0.0,
+        }
 
-    final_state = await agent.ainvoke(initial_state)
+        final_state = await agent.ainvoke(initial_state)
 
     return {
-        "answer": final_state.get("final_answer") or "No answer produced.",
+        "answer": final_state.get("answer") or "No answer produced.",
         "steps": final_state.get("steps", 0),
         "observations": final_state.get("observations", []),
         "cost_usd": final_state.get("cost_usd", 0.0),
     }
-
