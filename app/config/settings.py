@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     QDRANT_BASE_URL: str
     QDRANT_API_KEY: str
     WEB_SEARCH_COST:float
+    GROQ_API_KEY:str
+    COLLECTION_NAME:str="company_research"
 
     class Config:
         env_file = ".env"

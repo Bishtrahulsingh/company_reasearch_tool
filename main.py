@@ -6,13 +6,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.dependencies import get_qdrant_client
 from app.api.query import router as query_router
 from app.ingestion.qdrant_client import create_collection
-
-COLLECTION_NAME = "company_research"
+from app.config.settings import settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     client = get_qdrant_client()
-    await create_collection(client, COLLECTION_NAME)
+    await create_collection(client, settings.COLLECTION_NAME)
     yield
 
 app = FastAPI(lifespan=lifespan)

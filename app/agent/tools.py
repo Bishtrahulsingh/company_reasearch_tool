@@ -12,10 +12,9 @@ from app.ingestion.github_client import get_github_activity
 from app.ingestion.qdrant_client import upsert_chunks
 from app.ingestion.scraper import search_web
 from app.rag.retriever import retrieve
-from main import COLLECTION_NAME
 
 web_search_cost = settings.WEB_SEARCH_COST
-
+COLLECTION_NAME = settings.COLLECTION_NAME
 
 class ToolResult(BaseModel):
     result: Any

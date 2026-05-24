@@ -10,3 +10,4 @@ class AgentState(TypedDict):
     answer: str
     steps: int
     cost_usd: float
+    _pending_observation:Any
