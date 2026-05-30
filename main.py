@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.dependencies import get_qdrant_client
 from app.api.query import router as query_router
+from app.api.research import router as research_router
 from app.ingestion.qdrant_client import create_collection
 from app.config.settings import settings
 
@@ -19,6 +20,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(query_router)
+app.include_router(research_router)
 
 @app.get('/')
 async def index():
@@ -27,4 +29,3 @@ async def index():
 @app.get('/session/new')
 async def new_session():
     return {"session_id": str(uuid.uuid4())}
-

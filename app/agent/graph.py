@@ -1,12 +1,19 @@
+import asyncio
 import json
+import logging
 import re
 from langfuse import get_client, observe, propagate_attributes
 from langgraph.graph import END, START, StateGraph
 from langchain_groq import ChatGroq
+from app.agent.sanitizer import sanitize_tool_result
 from app.agent.state import AgentState
 from app.agent.tools import get_github_tool, query_rag_tool, search_web_tool
 from app.config.settings import settings
 from app.observability.costlogger import log_generation
+
+logger = logging.getLogger(__name__)
+
+_TOOL_TIMEOUT = 10.0
 
 langfuse = get_client()
 
@@ -136,27 +143,40 @@ async def act(state: AgentState) -> AgentState:
     session_id = parts[0]
     company = parts[1] if len(parts) > 1 else parts[0]
 
-    if tool_name == "query_rag":
-        result = await query_rag_tool(
-            query=tool_input.get("query", state["question"]),
-            company=company,
-            session_id=session_id,
-        )
-    elif tool_name == "search_web":
-        result = await search_web_tool(
-            query=tool_input.get("query", state["question"]),
-            company=company,
-            session_id=session_id,
-        )
-    elif tool_name == "get_github":
-        result = await get_github_tool(
-            repo=tool_input["repo"],
-            since_days=tool_input.get("since_days", 7),
-            company=company,
-            session_id=session_id,
-        )
-    else:
-        result = f"Unknown tool requested: {tool_name}"
+    try:
+        if tool_name == "query_rag":
+            result = await asyncio.wait_for(
+                query_rag_tool(
+                    query=tool_input.get("query", state["question"]),
+                    company=company,
+                    session_id=session_id,
+                ),
+                timeout=_TOOL_TIMEOUT,
+            )
+        elif tool_name == "search_web":
+            result = await asyncio.wait_for(
+                search_web_tool(
+                    query=tool_input.get("query", state["question"]),
+                    company=company,
+                    session_id=session_id,
+                ),
+                timeout=_TOOL_TIMEOUT,
+            )
+        elif tool_name == "get_github":
+            result = await asyncio.wait_for(
+                get_github_tool(
+                    repo=tool_input["repo"],
+                    since_days=tool_input.get("since_days", 7),
+                    company=company,
+                    session_id=session_id,
+                ),
+                timeout=_TOOL_TIMEOUT,
+            )
+        else:
+            result = f"Unknown tool requested: {tool_name}"
+    except asyncio.TimeoutError:
+        logger.warning("act: tool '%s' timed out after %.1fs", tool_name, _TOOL_TIMEOUT)
+        result = f"Tool '{tool_name}' timed out after {_TOOL_TIMEOUT}s — skipping."
 
     return {
         **state,
@@ -172,9 +192,10 @@ def observe_node(state: AgentState) -> AgentState:
 
     if pending is not None:
         if hasattr(pending, "model_dump"):
-            observations.append(json.dumps(pending.model_dump(), default=str))
+            raw = json.dumps(pending.model_dump(), default=str)
         else:
-            observations.append(str(pending))
+            raw = str(pending)
+        observations.append(sanitize_tool_result(raw))
 
     return {
         **state,
@@ -229,4 +250,13 @@ async def run_agent(question: str, company: str, session_id: str) -> dict:
         "steps": final_state.get("steps", 0),
         "observations": final_state.get("observations", []),
         "cost_usd": final_state.get("cost_usd", 0.0),
+        "sources_used": [
+            obs.get("source")
+            for obs in (
+                json.loads(o) if isinstance(o, str) else o
+                for o in final_state.get("observations", [])
+            )
+            if isinstance(obs, dict) and obs.get("source")
+        ],
+        "tool_calls_log": final_state.get("messages", []),
     }
