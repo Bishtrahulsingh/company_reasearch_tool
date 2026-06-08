@@ -1,14 +1,15 @@
 import uuid
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.agent.graph import run_agent
-
+from app.agent.orchestrator import run_orchestrator
 
 router = APIRouter(prefix="/api", tags=["research"])
+
 
 class ResearchRequest(BaseModel):
     company: str
     question: str
+    github_repo: str | None = None
 
 
 class ResearchResponse(BaseModel):
@@ -21,10 +22,11 @@ class ResearchResponse(BaseModel):
 @router.post("/research", response_model=ResearchResponse)
 async def research(body: ResearchRequest):
     session_id = str(uuid.uuid4())
-    result = await run_agent(
+    result = await run_orchestrator(
         question=body.question,
         company=body.company,
         session_id=session_id,
+        github_repo=body.github_repo,
     )
     return ResearchResponse(
         answer=result["answer"],
