@@ -7,9 +7,11 @@ from typing import Any, Dict
 from langchain_groq import ChatGroq
 from langfuse import get_client, observe, propagate_attributes
 
+from app.agent.critic_agent import run_critic
 from app.agent.github_agent import run as run_github
 from app.agent.research_agent import run as run_research
 from app.agent.graph import _extract_tokens
+from app.agent.synthesis_agent import run_synthesis
 from app.config.settings import settings
 from app.observability.costlogger import log_generation
 
@@ -144,4 +146,19 @@ async def run_orchestrator(
         merged = _merge(question, sub_questions, results)
         merged["cost_usd"] += plan_cost
 
-        return merged
+        synthesis = await run_synthesis(question, company, results)
+        verdict,critic_cost = await run_critic(question, synthesis["answer"], results)
+
+        if not verdict.approved:
+            synthesis = await run_synthesis(
+                question=question,
+                company=company,
+                agent_results=results,
+                issues=verdict.issues
+            )
+        return {
+            "answer": synthesis["answer"],
+            "sources_used": merged["sources_used"],
+            "cost_usd": merged["cost_usd"] + synthesis["cost_usd"]+critic_cost,
+            "steps": merged["steps"],
+        }

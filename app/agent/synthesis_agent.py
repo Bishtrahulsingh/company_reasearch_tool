@@ -26,7 +26,7 @@ llm = ChatGroq(
 )
 
 
-async def run_synthesis(question: str,company: str,agent_results: list[dict]) -> dict:
+async def run_synthesis(question: str,company: str,agent_results: list[dict],issues: list[str]=[]) -> dict:
     context = ""
     for i, result in enumerate(agent_results):
         context += f"\nSource {i+1}:\n{result.get('answer', '')}\n"
@@ -36,6 +36,12 @@ async def run_synthesis(question: str,company: str,agent_results: list[dict]) ->
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": f"Company: {company}\nQuestion: {question}\n\nResearch results:\n{context}"}
     ]
+
+    if issues:
+        messages.append({
+            "role": "user",
+            "content": f"Previous answer had these issues, please fix them:\n{"\n".join(issues)}"
+        })
 
     response = await llm.ainvoke(messages)
 
