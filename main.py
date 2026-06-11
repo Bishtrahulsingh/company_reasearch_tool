@@ -1,4 +1,7 @@
 from dotenv import load_dotenv
+
+from app.observability.tracer import add_tracing
+
 load_dotenv(override=False)
 
 import uuid
@@ -19,6 +22,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+add_tracing(app)
 app.include_router(query_router)
 app.include_router(research_router)
 
