@@ -18,7 +18,7 @@ def embed_chunks(chunks:List[Chunk],batch_size:int=18)->List[Chunk]:
         sparse_embedding = list(sparse_embedding_model.embed(text))
 
         for j in range(start,end):
-            chunks[j].embedding = embeddings[j-start]
+            chunks[j].embedding = embeddings[j-start].tolist()
             sp = sparse_embedding[j-start]
             chunks[j].sparse_embedding = {
                 'indices':sp.indices.tolist(),

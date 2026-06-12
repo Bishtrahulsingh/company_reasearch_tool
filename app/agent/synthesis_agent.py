@@ -5,7 +5,7 @@ from app.agent.graph import _extract_tokens
 from app.observability.costlogger import log_generation
 from langfuse import get_client, observe, propagate_attributes
 
-_MODEL_NAME = 'openai/gpt-oss-20b'
+_MODEL_NAME = 'llama-3.3-70b-versatile'
 langfuse = get_client()
 
 _SYSTEM_PROMPT = """

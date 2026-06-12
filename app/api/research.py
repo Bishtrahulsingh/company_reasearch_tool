@@ -1,4 +1,6 @@
 import uuid
+from typing import Union
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 from app.agent.orchestrator import run_orchestrator
@@ -10,6 +12,7 @@ class ResearchRequest(BaseModel):
     company: str
     question: str
     github_repo: str | None = None
+    session_id:Union[str,uuid.UUID]
 
 
 class ResearchResponse(BaseModel):
@@ -21,7 +24,7 @@ class ResearchResponse(BaseModel):
 
 @router.post("/research", response_model=ResearchResponse)
 async def research(body: ResearchRequest):
-    session_id = str(uuid.uuid4())
+    session_id = str(body.session_id)
     result = await run_orchestrator(
         question=body.question,
         company=body.company,

@@ -5,15 +5,13 @@ from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     HnswConfigDiff, PointStruct, Filter, FieldCondition, MatchValue,
     VectorParams, Distance, Match, SparseVector, SparseVectorParams,
-    Modifier, Prefetch, FusionQuery, Fusion,PayloadSchemaType
+    Modifier, Prefetch, FusionQuery, Fusion, PayloadSchemaType
 )
 from app.core.dependencies import get_qdrant_client
 from app.core.models import Chunk
 
 
-
-
-async def create_collection(client,name) -> None:
+async def create_collection(client, name) -> None:
     if await client.collection_exists(name):
         logger.info(f"Collection {name} already exists")
         return
@@ -36,11 +34,7 @@ async def create_collection(client,name) -> None:
     logger.info(f"Collection {name} created successfully")
 
 
-async def upsert_chunks(client,collection_name, chunks, batch: int = 32):
-    if not await client.collection_exists(collection_name):
-        logger.error(f"Collection {collection_name} does not exist")
-        return
-
+async def upsert_chunks(client, collection_name, chunks, batch: int = 32):
     total_size = len(chunks)
     for i in range(0, total_size, batch):
         start, end = i, min(i + batch, total_size)
@@ -72,7 +66,7 @@ async def upsert_chunks(client,collection_name, chunks, batch: int = 32):
 
 async def filter_chunks_by_company_name(
     collection_name: str,
-    client:AsyncQdrantClient,
+    client: AsyncQdrantClient,
     company: str,
     query_vector: List[float],
     sparse_vector: dict,
@@ -117,7 +111,7 @@ async def filter_chunks_by_company_name(
     return results.points
 
 
-async def retrieve_all_chunks(client,collection_name: str, company: str) -> List[Chunk]:
+async def retrieve_all_chunks(client, collection_name: str, company: str) -> List[Chunk]:
     company = company.lower().strip()
     results, _ = await client.scroll(
         collection_name=collection_name,

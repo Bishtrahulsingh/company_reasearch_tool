@@ -22,7 +22,7 @@ def parse_date(date_str):
 
 async def extract_from_url(client, site_url:str):
     try:
-        response = await client.get(site_url, timeout=10)
+        response = await client.get(site_url, timeout=30)
         text = trafilatura.extract(response.text)
         return text
     except Exception:
@@ -38,14 +38,14 @@ async def search_web(query, company)->WebSearchResult:
         'Content-Type': 'application/json'
     }
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=120) as client:
         response = await client.post(url, json=payload, headers=headers)
         data = response.json()
         summary = data.get('answerBox',{}).get('snippet','')
         organic = data.get('organic',[])
 
         items = []
-        for item in organic:
+        for item in organic[:3]:
             items.append({
                 'title': item.get('title'),
                 'text': None,

@@ -17,9 +17,11 @@ from app.observability.costlogger import log_generation
 
 
 logger = logging.getLogger(__name__)
-_MODEL_NAME = "llama-3.3-70b-versatile"
+_MODEL_NAME = "llama-3.1-8b-instant"
 langfuse = get_client()
 llm = ChatGroq(model=_MODEL_NAME, api_key=settings.GROQ_API_KEY, temperature=0)
+
+_SEMAPHORE = asyncio.Semaphore(2)
 
 _SYSTEM_PROMPT = """
 You are an orchestrator and planning agent for company reasearch tool. 
@@ -69,23 +71,24 @@ def _parse_sub_questions(raw: str) -> list[dict[str, Any]]:
     return cleaned_questions
 
 async def _dispatch( sub_question: dict[str, Any],company: str,session_id: str,github_repo: str | None)->dict:
-    question = sub_question.get('question')
-    if sub_question.get('type')=='github':
-        if github_repo:
-            return await run_github(question=question,company=company,session_id=session_id)
+    async with _SEMAPHORE:
+        question = sub_question.get('question')
+        if sub_question.get('type')=='github':
+            if github_repo:
+                return await run_github(question=question,company=company,session_id=session_id)
 
-    """ 
-    we are getting this data 
-    {
-        'answer':final_state.get('answer') or 'no answer produced',
-        'steps':final_state.get('steps',0),
-        'observations':final_state.get('observations',[]),
-        "cost_usd": final_state.get("cost_usd", 0.0),
-        "sources_used": _extract_sources(final_state.get("observations", [])),
-        "tool_calls_log": final_state.get("messages", []),
-    }
-    """
-    return await run_research(question,company,session_id)
+        """ 
+        we are getting this data 
+        {
+            'answer':final_state.get('answer') or 'no answer produced',
+            'steps':final_state.get('steps',0),
+            'observations':final_state.get('observations',[]),
+            "cost_usd": final_state.get("cost_usd", 0.0),
+            "sources_used": _extract_sources(final_state.get("observations", [])),
+            "tool_calls_log": final_state.get("messages", []),
+        }
+        """
+        return await run_research(question,company,session_id)
 
 def _merge( original_question: str, sub_questions: list[dict[str, Any]], results: list[dict], ) -> dict:
     sections = [f"Research results for: {original_question}\n"]

@@ -9,5 +9,6 @@ def get_qdrant_client() -> AsyncQdrantClient:
         _qdrant_client = AsyncQdrantClient(
             url=settings.QDRANT_BASE_URL,
             api_key=settings.QDRANT_API_KEY,
+            timeout=60
         )
     return _qdrant_client

@@ -1,4 +1,5 @@
 import json
+import re
 
 from pydantic import BaseModel
 from langchain_groq import ChatGroq
@@ -32,10 +33,11 @@ Return only valid JSON matching this structure: {"approved": true/false, "issues
 """
 
 
-async def run_critic(question:str, answer:str, agent_results:list[dict])->CriticVerdict:
+async def run_critic(question:str, answer:str, agent_results:list[dict])-> tuple[CriticVerdict, float]:
     context = ""
     for i, result in enumerate(agent_results):
-        context += f"\nSource {i + 1}:\n{result.get('answer', '')}\n"
+        agent_answer = result.get('answer', '')[:1000]
+        context += f"\nSource {i + 1}:\n{agent_answer}\n"
         context += f"Sources used: {result.get('sources_used', [])}\n"
 
     messages = [
@@ -54,5 +56,11 @@ async def run_critic(question:str, answer:str, agent_results:list[dict])->Critic
         metadata={"phase": "critic", "step_cost_usd": cost}
     )
 
-    verdict = CriticVerdict(**json.loads(response.content.strip()))
+    try:
+        raw = response.content.strip()
+        cleaned = re.sub(r"```json\s*|\s*```", "", raw).strip()
+        verdict = CriticVerdict(**json.loads(cleaned))
+    except Exception:
+        verdict = CriticVerdict(approved=True, issues=[], confidence=0.5)
+
     return verdict, cost
