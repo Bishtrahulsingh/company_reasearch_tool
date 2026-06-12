@@ -50,8 +50,21 @@ async def search_web_tool(query: str, company: str, session_id: str) -> ToolResu
         await upsert_chunks(client=client, collection_name=COLLECTION_NAME, chunks=[c.model_dump() for c in embedded])
 
     latency_ms = (time.perf_counter() - start) * 1000
+
+    excerpts = []
+    for item in result.items:
+        text = item.get("text") or ""
+        if not text:
+            continue
+        excerpts.append({
+            "title": item.get("title"),
+            "url": item.get("url"),
+            "published_at": str(item.get("published_at")) if item.get("published_at") else None,
+            "text": text[:1000],
+        })
+
     return ToolResult(
-        result={"summary": result.summary, "stored_chunks": len(chunks)},
+        result={"summary": result.summary, "stored_chunks": len(chunks), "excerpts": excerpts},
         source="serper api",
         latency_ms=round(latency_ms, 2),
         cost_usd=web_search_cost,

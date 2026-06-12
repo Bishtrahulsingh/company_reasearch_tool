@@ -17,10 +17,10 @@ from app.observability.costlogger import log_generation
 
 
 logger = logging.getLogger(__name__)
-_TOOL_TIMEOUT = 300.0
+_TOOL_TIMEOUT = 20.0
 _MODEL_NAME = 'llama-3.3-70b-versatile'
 
-_LLM_SEMAPHORE = asyncio.Semaphore(1)
+_LLM_SEMAPHORE = asyncio.Semaphore(2)
 
 langfuse = get_client()
 

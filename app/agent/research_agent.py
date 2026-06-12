@@ -32,7 +32,7 @@ graph = build_agent_graph(
         "search_web": search_web_tool,
         "query_rag": query_rag_tool,
     },
-    max_steps=3,
+    max_steps=4,
 )
 
 
