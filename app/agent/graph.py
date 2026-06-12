@@ -7,6 +7,7 @@ from json import JSONDecodeError
 from typing import Union, Tuple, Any, List, Dict
 
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langfuse import get_client, observe, propagate_attributes
 from langgraph.graph import END, START, StateGraph
 
@@ -18,7 +19,11 @@ from app.observability.costlogger import log_generation
 
 logger = logging.getLogger(__name__)
 _TOOL_TIMEOUT = 20.0
-_MODEL_NAME = 'llama-3.3-70b-versatile'
+
+if settings.LLM_PROVIDER == 'groq':
+    _MODEL_NAME = 'llama-3.3-70b-versatile'
+else:
+    _MODEL_NAME = 'gemini-2.0-flash'
 
 _LLM_SEMAPHORE = asyncio.Semaphore(2)
 
@@ -88,11 +93,18 @@ def _extract_sources(observations: list):
 
 
 def build_agent_graph(system_prompt: str, tools: dict, max_steps: int = 5):
-    llm = ChatGroq(
-        model=_MODEL_NAME,
-        api_key=settings.GROQ_API_KEY,
-        temperature=0,
-    )
+    if settings.LLM_PROVIDER == 'groq':
+        llm = ChatGroq(
+            model=_MODEL_NAME,
+            api_key=settings.GROQ_API_KEY,
+            temperature=0,
+        )
+    else:
+        llm = ChatGoogleGenerativeAI(
+            model=_MODEL_NAME,
+            google_api_key=settings.GOOGLE_API_KEY,
+            temperature=0,
+        )
 
     @observe(name='reason', as_type='generation')
     async def reason(state: AgentState):

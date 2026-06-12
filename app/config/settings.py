@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     LANGFUSE_PUBLIC_KEY:str
     LANGFUSE_BASE_URL:str
     COLLECTION_NAME:str="company_research"
-
+    GOOGLE_API_KEY: str
+    LLM_PROVIDER:str
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

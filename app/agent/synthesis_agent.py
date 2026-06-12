@@ -1,11 +1,16 @@
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config.settings import settings
 from app.agent.graph import _extract_tokens
 from app.observability.costlogger import log_generation
 from langfuse import get_client, observe, propagate_attributes
 
-_MODEL_NAME = 'llama-3.3-70b-versatile'
+if settings.LLM_PROVIDER == 'groq':
+    _MODEL_NAME = 'llama-3.3-70b-versatile'
+else:
+    _MODEL_NAME = 'gemini-2.0-flash'
+
 langfuse = get_client()
 
 _SYSTEM_PROMPT = """
@@ -19,11 +24,18 @@ If information is missing say so clearly
 
 """
 
-llm = ChatGroq(
-    model=_MODEL_NAME,
-    api_key=settings.GROQ_API_KEY,
-    temperature=0.1
-)
+if settings.LLM_PROVIDER == 'groq':
+    llm = ChatGroq(
+        model=_MODEL_NAME,
+        api_key=settings.GROQ_API_KEY,
+        temperature=0.1
+    )
+else:
+    llm = ChatGoogleGenerativeAI(
+        model=_MODEL_NAME,
+        google_api_key=settings.GOOGLE_API_KEY,
+        temperature=0.1
+    )
 
 
 async def run_synthesis(question: str,company: str,agent_results: list[dict],issues: list[str]=[]) -> dict:
@@ -40,7 +52,7 @@ async def run_synthesis(question: str,company: str,agent_results: list[dict],iss
     if issues:
         messages.append({
             "role": "user",
-            "content": f"Previous answer had these issues, please fix them:\n{"\n".join(issues)}"
+            "content": f"Previous answer had these issues, please fix them:\n{'\n'.join(issues)}"
         })
 
     response = await llm.ainvoke(messages)

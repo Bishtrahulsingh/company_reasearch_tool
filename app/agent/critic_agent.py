@@ -3,20 +3,32 @@ import re
 
 from pydantic import BaseModel
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 
 from app.config.settings import settings
 from app.agent.graph import _extract_tokens
 from app.observability.costlogger import log_generation
 from langfuse import get_client, observe, propagate_attributes
 
-_MODEL_NAME = 'llama-3.1-8b-instant'
+if settings.LLM_PROVIDER == 'groq':
+    _MODEL_NAME = 'llama-3.1-8b-instant'
+else:
+    _MODEL_NAME = 'gemini-2.0-flash'
+
 langfuse = get_client()
 
-llm = ChatGroq(
-    model=_MODEL_NAME,
-    api_key=settings.GROQ_API_KEY,
-    temperature=0
-)
+if settings.LLM_PROVIDER == 'groq':
+    llm = ChatGroq(
+        model=_MODEL_NAME,
+        api_key=settings.GROQ_API_KEY,
+        temperature=0
+    )
+else:
+    llm = ChatGoogleGenerativeAI(
+        model=_MODEL_NAME,
+        google_api_key=settings.GOOGLE_API_KEY,
+        temperature=0
+    )
 
 
 class CriticVerdict(BaseModel):
