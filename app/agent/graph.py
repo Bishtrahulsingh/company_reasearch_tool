@@ -41,14 +41,16 @@ def _parse_json(data: str):
 
     try:
         return json.loads(cleaned)
-    except JSONDecodeError:
-        match = re.search(r'(\{.*\}|\[.*\])', cleaned, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(1))
-            except JSONDecodeError:
-                pass
-        raise Exception(f'invalid json data found. Raw (first 300 chars): {cleaned[:300]!r}')
+    except JSONDecodeError as e:
+        decoder = json.JSONDecoder()
+        for start in range(len(cleaned)):
+            if cleaned[start] in '{[':
+                try:
+                    obj, _ = decoder.raw_decode(cleaned, start)
+                    return obj
+                except JSONDecodeError:
+                    continue
+        raise Exception(f'invalid json data found. Raw (first 300 chars): {cleaned[:300]!r}') from e
 
 
 def _company_key(session_id: Union[str, uuid.UUID], company: str) -> str:
