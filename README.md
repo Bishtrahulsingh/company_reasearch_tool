@@ -6,6 +6,9 @@
 
 ---
 
+## Live Link
+**▶ [Visit Site](https://researchloop-frontend.vercel.app/)**
+
 ## Overview
 
 A multi-agent, retrieval-augmented research API that answers natural-language questions about companies by combining live web search, GitHub developer-activity signals, and a persistent vector knowledge base — with built-in cost tracking, observability, and an automated quality-control (critic) loop.
